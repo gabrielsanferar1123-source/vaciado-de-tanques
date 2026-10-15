@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Laboratorio de Vaciado de Tanques</title>
-  <meta name="description" content="Modelamiento matemático del vaciado de tanques: ley de Torricelli, mínimos cuadrados, diferenciación numérica y EDO. Genera el artículo en PDF.">
+  <title>Laboratorio Virtual de Vaciado de Tanques</title>
+  <meta name="description" content="Laboratorio virtual paramétrico: tanque 3D, ley de Torricelli, tabla de mediciones, gráficas sincronizadas, desarrollo matemático completo y artículo en PDF según Plaza Gálvez (2017).">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="vendor/katex/katex.min.css">
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -15,17 +15,15 @@
   <header class="topbar no-print">
     <div class="brand">
       <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M7 5h18l-2 20a3 3 0 0 1-3 2h-8a3 3 0 0 1-3-2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.6 14h14.8l-1.2 11a2 2 0 0 1-2 1.6h-8.4a2 2 0 0 1-2-1.6z" fill="#3b82f6"/><path d="M16 27v4" stroke="#3b82f6" stroke-width="2"/></svg>
-      <div><strong>Laboratorio de Vaciado de Tanques</strong><span>Torricelli · Mínimos cuadrados · EDO</span></div>
+      <div><strong>Laboratorio Virtual · Vaciado de Tanques</strong><span>Torricelli · EDO · Mínimos cuadrados</span></div>
     </div>
     <nav class="steps" id="nav">
-      <a href="#tanque">1 Tanque</a>
-      <a href="#teoria">2 Teoría</a>
-      <a href="#datos">3 Datos</a>
-      <a href="#regresion">4 Regresión</a>
-      <a href="#derivada">5 Derivada</a>
-      <a href="#modelos">6 Modelos EDO</a>
-      <a href="#resultados">7 Resultados</a>
-      <a href="#articulo">8 Artículo</a>
+      <a href="#sim">Simulación 3D</a>
+      <a href="#graficas">Gráficas</a>
+      <a href="#tabla">Tabla</a>
+      <a href="#desarrollo">Desarrollo</a>
+      <a href="#metodo">Método del artículo</a>
+      <a href="#articulo">Artículo</a>
     </nav>
     <button class="btn primary" data-action="pdf">Exportar PDF</button>
   </header>
@@ -33,133 +31,178 @@
   <div class="layout">
     <aside class="config no-print" id="config">
       <section class="panel">
+        <h3>Ejemplos</h3>
+        <select id="preset" aria-label="Cargar ejemplo">
+          <option value="">Cargar un ejemplo…</option>
+          <option value="articulo">Experimento del artículo (balde)</option>
+          <option value="cilindro">Cilindro 0,80 × 1,20 m · salida 20 mm</option>
+          <option value="rectangular">Tanque rectangular 1,0 × 0,6 m · 3/4"</option>
+          <option value="cono">Tolva cónica 0,8 m · salida 15 mm</option>
+          <option value="esfera">Esfera 1,2 m · salida 25 mm</option>
+          <option value="horizontal">Cilindro horizontal 1,0 × 2,5 m · 1"</option>
+        </select>
+      </section>
+      <section class="panel">
         <h3>Tanque</h3>
-        <label>Geometría
-          <select id="geom"></select>
-        </label>
+        <label>Geometría<select id="geom"></select></label>
+        <div class="seg" id="unitSeg" role="radiogroup" aria-label="Unidad de longitud">
+          <button data-unit="mm">mm</button><button data-unit="cm" class="on">cm</button><button data-unit="m">m</button>
+        </div>
         <div id="geomParams" class="grid2"></div>
-        <label>Nivel inicial h₀ (cm)
-          <input type="number" id="h0" step="0.1" min="0.1" value="45.7">
-        </label>
-        <p class="hint" id="h0hint"></p>
-      </section>
-      <section class="panel">
-        <h3>Orificio y líquido</h3>
-        <div class="grid2">
-          <label>Diámetro d (mm)
-            <input type="number" id="dmm" step="0.1" min="0.5" value="8">
-          </label>
-          <label>Coef. descarga C<sub>d</sub>
-            <input type="number" id="cd" step="0.01" min="0.05" max="1.5" value="0.61">
-          </label>
-        </div>
-        <p class="hint">C<sub>d</sub> ≈ 0,61 orificio de pared delgada · 0,82 boquilla corta · 1 ideal (Torricelli puro).</p>
-        <label>Líquido
-          <input type="text" id="fluid" value="agua">
+        <label>Altura inicial del líquido h₀ <span class="u" data-u></span>
+          <input type="text" inputmode="decimal" id="h0" value="45,7">
         </label>
       </section>
       <section class="panel">
-        <h3>Fuente de datos</h3>
-        <div class="seg" id="srcSeg" role="radiogroup">
-          <button data-src="paper" class="on">Artículo</button>
-          <button data-src="sim">Simulación</button>
-          <button data-src="own">Mis datos</button>
+        <h3>Sistema de vaciado</h3>
+        <label>Diámetro interior de la salida
+          <input type="text" id="dout" value="8 mm" placeholder="20 mm · 3/4&quot; · 1&quot;">
+        </label>
+        <p class="hint" id="doutHint"></p>
+        <label>Elevación de la salida sobre el fondo z₀ <span class="u" data-u></span>
+          <input type="text" inputmode="decimal" id="z0" value="0">
+        </label>
+        <div class="seg" id="modelSeg" role="radiogroup" aria-label="Modelo">
+          <button data-model="ideal">Ideal (C<sub>d</sub> = 1)</button>
+          <button data-model="cd" class="on">Con C<sub>d</sub></button>
         </div>
-        <div data-for="paper" class="srcbox">
-          <p class="hint">Datos reales de Plaza Gálvez (2017), Tablas 1 y 2: 24 lecturas cada 0,5 min. Sirven para verificar que la web reproduce exactamente el artículo.</p>
-        </div>
-        <div data-for="sim" class="srcbox" hidden>
-          <label class="check"><input type="checkbox" id="dtAuto" checked> Δt automático (≈ 24 lecturas)</label>
-          <div class="grid2">
-            <label>Δt (min)<input type="number" id="dt" step="0.05" min="0.01" value="0.5"></label>
-            <label>Resolución (cm)<input type="number" id="res" step="0.05" min="0" value="0.1"></label>
-            <label>Ruido σ (cm)<input type="number" id="sigma" step="0.05" min="0" value="0.15"></label>
-            <label>Semilla<input type="number" id="seed" step="1" value="7"></label>
-          </div>
-          <button class="btn small" data-action="reseed">Nueva muestra aleatoria</button>
-        </div>
-        <div data-for="own" class="srcbox" hidden>
-          <label>Pega dos columnas: t (min) y h (cm)
-            <textarea id="ownData" rows="10" spellcheck="false" placeholder="0	45,7&#10;0,5	43&#10;1	40,4"></textarea>
-          </label>
-          <p class="hint">Acepta tabulador, espacio o punto y coma; coma o punto decimal (se puede pegar desde Excel).</p>
-          <button class="btn small" data-action="copyData">Copiar datos actuales aquí</button>
-          <p class="err" id="ownErr"></p>
-        </div>
+        <label id="cdWrap">Coeficiente de descarga C<sub>d</sub>
+          <input type="text" inputmode="decimal" id="cd" value="0,61">
+        </label>
+        <p class="hint" id="cdHint">C<sub>d</sub> = 1 es el modelo ideal. Un orificio real requiere calibración experimental (orientativo: ≈ 0,61 orificio de pared delgada).</p>
       </section>
       <section class="panel">
-        <h3>Formato</h3>
-        <div class="seg" id="decSeg">
-          <button data-dec="," class="on">Coma decimal</button>
-          <button data-dec=".">Punto decimal</button>
+        <h3>Intervalo de medición Δt</h3>
+        <div class="chips" id="dtChips">
+          <button data-dt="1">1 s</button><button data-dt="5">5 s</button><button data-dt="10">10 s</button><button data-dt="15">15 s</button><button data-dt="30" class="on">30 s</button><button data-dt="60">60 s</button><button data-dt="custom">Personalizado</button>
         </div>
-        <button class="btn ghost small" data-action="preset">Restablecer ejemplo del artículo</button>
+        <label id="dtCustomWrap" hidden>Intervalo personalizado (s)
+          <input type="text" inputmode="decimal" id="dtCustom" value="20">
+        </label>
+        <p class="hint">Δt solo cambia los instantes de muestreo de h(t); la física y el tiempo de vaciado no cambian.</p>
       </section>
+      <section class="panel">
+        <h3>Presentación</h3>
+        <div class="row2">
+          <span class="lbl">Decimales</span>
+          <div class="seg compact" id="digSeg"><button data-dig="2">2</button><button data-dig="3">3</button><button data-dig="4" class="on">4</button><button data-dig="6">6</button></div>
+        </div>
+        <div class="row2">
+          <span class="lbl">Separador</span>
+          <div class="seg compact" id="decSeg"><button data-dec="," class="on">0,5</button><button data-dec=".">0.5</button></div>
+        </div>
+      </section>
+      <div class="msgs" id="msgs" aria-live="polite"></div>
     </aside>
 
     <main id="main">
-      <div class="banner" id="banner" hidden></div>
+      <!-- Simulación -->
+      <section class="card" id="sim">
+        <div class="viewer-wrap">
+          <div class="viewer" id="viewer"></div>
+          <div class="viewer-hint">Arrastrar: girar · Rueda: zoom · Clic derecho: desplazar</div>
+          <button class="btn small viewer-btn" data-action="home">Vista inicial</button>
+        </div>
+        <div class="player">
+          <div class="player-btns">
+            <button class="btn primary" id="playBtn" data-action="play">▶ Reproducir</button>
+            <button class="btn" data-action="restart">↺ Reiniciar</button>
+          </div>
+          <div class="player-track">
+            <input type="range" id="tSlider" min="0" max="1000" step="1" value="0" aria-label="Tiempo de simulación">
+            <div class="player-times"><span id="tNow">t = 0 s</span><span id="tEnd"></span></div>
+          </div>
+          <label class="speed">Velocidad
+            <select id="speed">
+              <option value="0.5">0,5×</option><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option><option value="20">20×</option><option value="50">50×</option><option value="100">100×</option><option value="200">200×</option><option value="500">500×</option>
+            </select>
+          </label>
+        </div>
+        <div class="live" id="live"></div>
+        <div class="summary" id="summary"></div>
+      </section>
 
-      <!-- 1. Tanque -->
-      <section class="card" id="tanque">
-        <div class="card-head"><span class="num">1</span><div><h2>El tanque</h2><p>Geometría, orificio y simulación del vaciado según la ley de Torricelli.</p></div></div>
-        <div class="tank-wrap">
-          <div class="tank-view">
-            <div id="tankSvg"></div>
-            <div class="player">
-              <button class="btn small" data-action="play" id="playBtn">▶ Simular vaciado</button>
-              <input type="range" id="tSlider" min="0" max="1000" value="0" aria-label="Tiempo">
-            </div>
-          </div>
-          <div>
-            <div class="kpis" id="kpis"></div>
-            <div class="live" id="live"></div>
-          </div>
+      <!-- Gráficas -->
+      <section class="card" id="graficas">
+        <div class="card-head"><div><h2>Gráficas</h2><p>Pasa el mouse para ver valores · arrastra para hacer zoom (doble clic restablece) · clic para mover el tiempo · la leyenda activa/desactiva series.</p></div>
+          <label class="check"><input type="checkbox" id="overlay"> Superponer datos experimentales</label></div>
+        <div class="chart-grid">
+          <div id="chH"></div><div id="chV"></div><div id="chQ"></div><div id="chv"></div>
         </div>
       </section>
 
-      <!-- 2. Teoría -->
-      <section class="card" id="teoria">
-        <div class="card-head"><span class="num">2</span><div><h2>Modelo teórico: ley de Torricelli</h2><p>Derivación paso a paso con los valores del tanque configurado.</p></div></div>
-        <div id="theory"></div>
+      <!-- Tabla -->
+      <section class="card" id="tabla">
+        <div class="card-head"><div><h2>Tabla de mediciones</h2><p id="tableSub"></p></div>
+          <div class="head-actions"><button class="btn small" data-action="csvTable">Descargar CSV</button></div></div>
+        <div class="tabs" role="tablist">
+          <button class="tab on" data-ttab="calc">Tabla calculada (modelo teórico)</button>
+          <button class="tab" data-ttab="paper">Datos del artículo (experimentales)</button>
+        </div>
+        <div id="tblCalc" class="tblwrap scroll tall"></div>
+        <div id="tblPaper" hidden></div>
       </section>
 
-      <!-- 3. Datos -->
+      <!-- Desarrollo matemático -->
+      <section class="card" id="desarrollo">
+        <div class="card-head"><div><h2>Desarrollo matemático</h2><p>Cada bloque muestra fórmula general → sustitución → resultado, en unidades SI.</p></div>
+          <div class="head-actions"><button class="btn small" data-action="toggleDev">Plegar todo</button></div></div>
+        <div id="dev" class="dev"></div>
+      </section>
+
+      <!-- Método del artículo -->
+      <div class="part-title" id="metodo">
+        <h2>Método del artículo de Plaza Gálvez (2017)</h2>
+        <p>Regresión, diferenciación numérica y ecuaciones diferenciales a partir de mediciones h(t). Unidades del artículo: cm y min.</p>
+      </div>
       <section class="card" id="datos">
-        <div class="card-head"><span class="num">3</span><div><h2>Toma de datos</h2><p>Tabla 1 · altura del nivel contra el tiempo.</p></div></div>
+        <div class="card-head"><span class="num">A</span><div><h2>Datos para el análisis</h2><p>Elige qué mediciones se analizan.</p></div></div>
+        <div class="seg wide" id="srcSeg" role="radiogroup">
+          <button data-src="paper" class="on">Datos del artículo</button>
+          <button data-src="table">Tabla calculada</button>
+          <button data-src="own">Mis datos</button>
+        </div>
+        <div data-for="table" class="srcbox" hidden>
+          <div class="grid3">
+            <label>Ruido de medición σ (cm)<input type="text" inputmode="decimal" id="sigma" value="0"></label>
+            <label>Resolución de lectura (cm)<input type="text" inputmode="decimal" id="res" value="0"></label>
+            <label>Semilla<input type="number" id="seed" step="1" value="7"></label>
+          </div>
+          <p class="hint">Con σ = 0 se analiza la solución teórica exacta muestreada cada Δt. Un σ &gt; 0 imita errores de lectura con regla y cronómetro.</p>
+        </div>
+        <div data-for="own" class="srcbox" hidden>
+          <label>Pega dos columnas: t (min) y h (cm)
+            <textarea id="ownData" rows="8" spellcheck="false" placeholder="0	45,7&#10;0,5	43&#10;1	40,4"></textarea>
+          </label>
+          <p class="hint">Acepta tabulador, espacio o punto y coma, y coma o punto decimal (se puede pegar desde Excel).</p>
+          <button class="btn small" data-action="copyData">Copiar los datos actuales aquí</button>
+          <p class="err" id="ownErr"></p>
+        </div>
+        <div class="banner" id="banner" hidden></div>
         <div id="dataSec"></div>
       </section>
-
-      <!-- 4. Regresión lineal -->
       <section class="card" id="regresion">
-        <div class="card-head"><span class="num">4</span><div><h2>Regresión lineal h = f(t)</h2><p>Primer modelo: mínimos cuadrados directamente sobre los datos.</p></div></div>
+        <div class="card-head"><span class="num">B</span><div><h2>Regresión lineal h = f(t)</h2><p>Primer modelo: mínimos cuadrados directamente sobre los datos.</p></div></div>
         <div id="linSec"></div>
       </section>
-
-      <!-- 5. Derivada -->
       <section class="card" id="derivada">
-        <div class="card-head"><span class="num">5</span><div><h2>Diferenciación numérica</h2><p>Diferencias centradas de tres puntos · Tablas 2 y 3.</p></div></div>
+        <div class="card-head"><span class="num">C</span><div><h2>Diferenciación numérica</h2><p>Diferencias centradas de tres puntos · Tablas 2 y 3.</p></div></div>
         <div id="derivSec"></div>
       </section>
-
-      <!-- 6. Modelos -->
       <section class="card" id="modelos">
-        <div class="card-head"><span class="num">6</span><div><h2>Ecuaciones diferenciales por regresión</h2><p>Cuadros 4 y 5 · ajuste de −dh/dt = f(h) y solución por separación de variables.</p></div></div>
+        <div class="card-head"><span class="num">D</span><div><h2>Ecuaciones diferenciales por regresión</h2><p>Cuadros 4 y 5 · ajuste de −dh/dt = f(h) y solución por separación de variables.</p></div></div>
         <div id="modelSec"></div>
       </section>
-
-      <!-- 7. Resultados -->
       <section class="card" id="resultados">
-        <div class="card-head"><span class="num">7</span><div><h2>Análisis de resultados</h2><p>Cuadro 6 · comparación de los modelos con los datos reales.</p></div></div>
+        <div class="card-head"><span class="num">E</span><div><h2>Análisis de resultados</h2><p>Cuadro 6 · comparación de los modelos con los datos.</p></div></div>
         <div id="resSec"></div>
       </section>
 
-      <!-- 8. Artículo -->
+      <!-- Artículo -->
       <section class="card" id="articulo">
-        <div class="card-head"><span class="num">8</span><div><h2>Artículo científico</h2><p>Se genera automáticamente con los resultados actuales. Revisa los datos de autoría y exporta a PDF.</p></div></div>
+        <div class="card-head"><span class="num">F</span><div><h2>Artículo científico</h2><p>Se genera automáticamente con los resultados actuales. Completa la autoría y exporta a PDF.</p></div></div>
         <div class="meta-form no-print" id="metaForm">
           <label class="full">Título<input id="mTitle" type="text"></label>
-          <label class="full">Título en inglés<input id="mTitleEn" type="text"></label>
           <label>Autor(es)<input id="mAuthors" type="text" placeholder="Nombre Apellido, Nombre Apellido"></label>
           <label>Correo<input id="mEmail" type="text" placeholder="correo@universidad.edu.co"></label>
           <label class="full">Institución<input id="mAffil" type="text"></label>
@@ -170,10 +213,10 @@
             <label class="check"><input type="checkbox" id="mTwoCol" checked> Formato revista (dos columnas)</label>
             <label class="check"><input type="checkbox" id="mEdit"> Permitir editar el texto en la vista previa</label>
             <span class="spacer"></span>
-            <button class="btn" data-action="csv">Descargar datos (CSV)</button>
+            <button class="btn" data-action="csv">Descargar análisis (CSV)</button>
             <button class="btn primary" data-action="pdf">Exportar artículo en PDF</button>
           </div>
-          <p class="hint full">En el cuadro de impresión elige <b>“Guardar como PDF”</b>, tamaño <b>A4</b>, márgenes <b>predeterminados</b>, activa <b>“Gráficos de fondo”</b> y desactiva <b>“Encabezados y pies de página”</b>.</p>
+          <p class="hint full">En el cuadro de impresión elige <b>“Guardar como PDF”</b>, tamaño <b>A4</b>, activa <b>“Gráficos de fondo”</b> y desactiva <b>“Encabezados y pies de página”</b>.</p>
         </div>
         <div class="paper-stage" id="paperStage"></div>
       </section>
@@ -183,8 +226,13 @@
   </div>
 
   <script src="vendor/katex/katex.min.js"></script>
+  <script src="vendor/three/three.min.js"></script>
+  <script src="vendor/three/OrbitControls.js"></script>
+  <script src="js/units.js"></script>
   <script src="js/numeric.js"></script>
   <script src="js/charts.js"></script>
+  <script src="js/ichart.js"></script>
+  <script src="js/tank3d.js"></script>
   <script src="js/article.js"></script>
   <script src="js/app.js"></script>
 </body>

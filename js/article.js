@@ -52,8 +52,12 @@
       exponencial: 't_v = \\dfrac{1 - e^{-B h_0}}{A B}',
       potencial: 't_v = \\dfrac{h_0^{\\,1-n}}{(1-n)A}'
     },
-    torricelliSol: (key) => {
+    torricelliSol: (key, z0 = 0) => {
       const T = Num.TANKS[key];
+      if (z0 > 0) {
+        if (T.constArea) return 'h(t) = z_0 + \\left[\\sqrt{h_0 - z_0} - \\dfrac{C_d A_0}{A_w}\\sqrt{\\dfrac{g}{2}}\\;t\\right]^2';
+        return 't(h) = \\dfrac{1}{C_d A_0\\sqrt{2g}}\\int_h^{h_0}\\dfrac{A_w(s)}{\\sqrt{s - z_0}}\\,ds';
+      }
       if (T.constArea) return 'h(t) = \\left[\\sqrt{h_0} - \\dfrac{C_d A_0}{A_w}\\sqrt{\\dfrac{g}{2}}\\;t\\right]^2';
       return T.tSym();
     },
@@ -69,6 +73,13 @@
   const eq = (tex, n) => `<div class="eq"><div class="eq-body">${K(tex, true)}</div><div class="eq-num">(${n})</div></div>`;
   function table(headers, rows, caption, cls = '') {
     return `<figure class="tbl ${cls}"><table><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table><figcaption>${caption}</figcaption></figure>`;
+  }
+  /* Para series largas (p. ej. Δt = 1 s) el artículo muestra filas equiespaciadas. */
+  function thin(rows, max = 36) {
+    if (rows.length <= max) return { rows, note: '' };
+    const idx = new Set();
+    for (let i = 0; i < max; i++) idx.add(Math.round(i * (rows.length - 1) / (max - 1)));
+    return { rows: rows.filter((_, i) => idx.has(i)), note: ` Se muestran ${idx.size} de ${rows.length} filas, equiespaciadas; los cálculos usan todas.` };
   }
   const fig = (svg, caption, cls = '') => `<figure class="fig ${cls}">${svg}<figcaption>${caption}</figcaption></figure>`;
 
@@ -120,6 +131,7 @@
   /* ---- Artículo completo ---- */
   function build(ctx) {
     const { meta, key, p, d, Cd, theory, R, src, CdFit, fitModel, nEff } = ctx;
+    const z0 = ctx.z0 || 0;
     const T = Num.TANKS[key];
     const [ml, me, mp] = R.models;
     const best = R.best;
@@ -135,8 +147,10 @@
     let srcText;
     if (src.mode === 'paper') {
       srcText = `Se emplearon los datos experimentales reportados por Plaza Gálvez [4], obtenidos en el laboratorio de Ingeniería con un recipiente plástico provisto de un orificio lateral en el fondo. Cada 30 segundos se registró la altura del nivel, tomando como cero de tiempo el instante en que el nivel pasó por la marca de referencia; a cada lectura se le restó una misma cifra (45,7 cm) para referir las alturas a la base del tanque. La práctica se filmó para conservar el registro histórico y poder confrontar los datos.`;
-    } else if (src.mode === 'sim') {
-      srcText = `Los datos se obtuvieron mediante una simulación del ensayo basada en la ley de Torricelli para el tanque descrito, con lecturas cada ${fmtT(src.dt, 3)} min, resolución de lectura de ${fmtT(src.res, 3)} cm y un ruido de medición gaussiano de desviación estándar ${fmtT(src.sigma, 3)} cm, con el fin de emular la toma de datos con cronómetro y regla graduada.`;
+    } else if (src.mode === 'table') {
+      srcText = src.sigma > 0
+        ? `Los datos se obtuvieron mediante una simulación del ensayo basada en la ley de Torricelli para el tanque descrito, con lecturas cada ${fmtT(src.dtSec, 3)} s, ${src.res > 0 ? `resolución de lectura de ${fmtT(src.res, 3)} cm y ` : ''}un ruido de medición gaussiano de desviación estándar ${fmtT(src.sigma, 3)} cm, con el fin de emular la toma de datos con cronómetro y regla graduada.`
+        : `Los datos corresponden a la solución teórica de la ecuación (4) muestreada cada ${fmtT(src.dtSec, 3)} s hasta el vaciado, sin ruido de medición; sirven para verificar que el método numérico recupera el modelo físico.`;
     } else {
       srcText = esc(meta.procedure || '');
     }
@@ -146,7 +160,7 @@
 
     let html = `<article class="paper ${meta.twoCol ? 'two-col' : 'one-col'}" id="paper" ${meta.editable ? 'contenteditable="true" spellcheck="false"' : ''}>`;
     html += `<div class="paper-runhead"><span>${esc(meta.journal)}</span><span>${esc(meta.date)}</span></div>`;
-    html += `<header class="paper-head"><h1>${esc(meta.title)}</h1><p class="paper-entitle">${esc(meta.titleEn)}</p>`;
+    html += `<header class="paper-head"><h1>${esc(meta.title)}</h1>`;
     html += `<p class="paper-authors">${esc(meta.authors)}</p><p class="paper-affil">${esc(meta.affiliation)}${meta.email ? '<br>' + esc(meta.email) : ''}</p></header>`;
     html += '<div class="paper-body">';
 
@@ -171,20 +185,21 @@
     html += `<p>Al reemplazar (${eqn.a}) en (${eqn.v}) se llega a</p>`;
     eqn.ode = E(); html += eq('\\dfrac{dh}{dt} = -\\dfrac{C_d\\,A_0}{A_w(h)}\\sqrt{2gh}', eqn.ode);
     html += `<p>que es una ecuación diferencial de variables separables. Para el tanque ${T.articulo} el área de la superficie libre es ${K(T.areaSym())}, de modo que la solución con la condición inicial ${K('h(0)=h_0')} es:</p>`;
-    eqn.tor = E(); html += eq(TeX.torricelliSol(key), eqn.tor);
+    eqn.tor = E(); html += eq(TeX.torricelliSol(key, z0), eqn.tor);
     html += `<p>${T.constArea ? `con ${K('h_0')} como el máximo nivel de líquido para ${K('t=0')}. Esta es una aplicación clásica expuesta en textos de ecuaciones diferenciales [3]; con ${K('C_d = 1')} corresponde al caso ideal.` : `donde ${K('h_0')} es el nivel inicial y ${K('t(h)')} es el tiempo necesario para que el nivel descienda hasta <i>h</i>. Con ${K('h = 0')} se obtiene el tiempo teórico de vaciado.`}</p>`;
     html += fig(Charts.tank(key, p, h0, { width: 300, height: 300, flow: true }), `Figura 1: Diagrama del tanque ${T.articulo}. Ley de Torricelli.`);
 
     // III. Modelo propuesto
     html += `<h2>III. Modelo propuesto</h2>`;
-    html += `<p>Se desea modelar el vaciado de un tanque ${T.articulo} con ${T.dims(p)}, que se llena inicialmente de ${esc(meta.fluid)} hasta una altura ${K(`h_0 = ${tn(h0, 2, true)}\\ \\text{cm}`)} (volumen inicial de ${fmt(V0, 2)} L). El tanque cuenta con un orificio circular en el fondo de diámetro ${K(`d = ${tn(d * 10, 2, true)}\\ \\text{mm}`)}, es decir, ${K(`A_0 = \\pi d^2/4 = ${tn(A0, 4)}\\ \\text{cm}^2`)}, que regula el paso del líquido en su salida. El área de la superficie libre es</p>`;
+    html += `<p>Se desea modelar el vaciado de un tanque ${T.articulo} con ${T.dims(p)}, que se llena inicialmente de ${esc(meta.fluid)} hasta una altura ${K(`h_0 = ${tn(h0, 2, true)}\\ \\text{cm}`)} (volumen inicial de ${fmt(V0, 2)} L). El tanque cuenta con un orificio circular en el fondo de diámetro ${K(`d = ${tn(d * 10, 2, true)}\\ \\text{mm}`)}, es decir, ${K(`A_0 = \\pi d^2/4 = ${tn(A0, 4)}\\ \\text{cm}^2`)}, que regula el paso del líquido en su salida${z0 > 0 ? `, ubicado a ${K(`z_0 = ${tn(z0, 2, true)}\\ \\text{cm}`)} sobre el fondo; en ese caso la carga hidráulica es ${K('h - z_0')} y el tanque se vacía hasta el nivel de la salida` : ''}. El área de la superficie libre es</p>`;
     html += `<div class="eq"><div class="eq-body">${K(T.areaNum(p), true)}</div></div>`;
     html += `<p>Con ${K(`g = 981\\ \\text{cm/s}^2`)} y un coeficiente de descarga ${K(`C_d = ${tn(Cd, 3, true)}`)}, la ecuación (${eqn.tor}) predice un tiempo teórico de vaciado de ${minsec(theory.tEmpty)} y un caudal inicial de ${fmt(theory.Q(h0), 2)} cm³/s.</p>`;
 
     // IV. Toma de datos
     html += `<h2>IV. Toma de datos</h2>`;
     html += `<p>${srcText} Los datos quedaron consignados en la Tabla 1 (paso de tiempo: ${dtTxt}).</p>`;
-    html += table(['t (min)', 'h (cm)'], R.tRaw.map((t, i) => [fmtT(t, 4), fmtT(R.h[i], 4)]), 'Tabla 1. Toma de datos h = f(t).', 'narrow');
+    const t1 = thin(R.tRaw.map((t, i) => [fmtT(t, 4), fmtT(R.h[i], 4)]));
+    html += table(['t (min)', 'h (cm)'], t1.rows, 'Tabla 1. Toma de datos h = f(t).' + t1.note, 'narrow');
 
     // V. Regresión lineal
     html += `<h2>V. Regresión lineal</h2>`;
@@ -198,9 +213,11 @@
     html += `<p>Para llevar a cabo la diferenciación se utiliza el método numérico de tres puntos con diferencias centradas propuesto en [1], en el que la derivada se obtiene a partir de la expansión en serie de Taylor, aproximándola por diferencias divididas finitas:</p>`;
     eqn.cd = E(); html += eq('f\'(t_i) \\approx \\dfrac{f(t_{i+1}) - f(t_{i-1})}{t_{i+1} - t_{i-1}} = \\dfrac{f(t+\\Delta t) - f(t-\\Delta t)}{2\\,\\Delta t}', eqn.cd);
     html += `<p>donde ${K('\\Delta t')} es el tamaño de paso de la variable independiente, en este caso el tiempo${R.uniform ? `; como se observa en la Tabla 1, ${K(`\\Delta t = ${tn(R.steps[0], 4, true)}\\ \\text{min}`)}, por lo que el denominador es ${K(`2\\Delta t = ${tn(2 * R.steps[0], 4, true)}`)}` : '; como el paso no es constante se usa la forma general con ' + K('t_{i+1}-t_{i-1}')}. A partir de los datos de la Tabla 1 se construye la Tabla 2. Por ejemplo, para ${K(`t = ${tn(R.t[1], 3, true)}`)}: ${K(`\\dfrac{dh}{dt} \\approx \\dfrac{${tn(R.h[2], 3, true)} - ${tn(R.h[0], 3, true)}}{${tn(R.t[2] - R.t[0], 3, true)}} = ${tn(R.deriv[1], 3)}\\ \\text{cm/min}`)}.</p>`;
-    html += table(['t (min)', 'h (cm)', 'dh/dt = Δh/(2Δt)'], R.tRaw.map((t, i) => [fmtT(t, 4), fmtT(R.h[i], 4), R.deriv[i] === null ? '' : fmtT(R.deriv[i], 4)]), 'Tabla 2. Cálculo de la derivada h = f(t).', 'narrow');
+    const t2 = thin(R.tRaw.map((t, i) => [fmtT(t, 4), fmtT(R.h[i], 4), R.deriv[i] === null ? '' : fmtT(R.deriv[i], 4)]));
+    html += table(['t (min)', 'h (cm)', 'dh/dt = Δh/(2Δt)'], t2.rows, 'Tabla 2. Cálculo de la derivada h = f(t).' + t2.note, 'narrow');
     html += `<p>En la Tabla 2 la primera y la última fila no presentan cálculo de derivada por la forma de (${eqn.cd}). Se extrae entonces la Tabla 3, tomando valores positivos de ${K('dh/dt')} (es decir, ${K('-dh/dt')}), con la que se realizan los diferentes tipos de regresión.${R.excluded ? ` Para las regresiones exponencial y potencial se excluyeron ${R.excluded} punto(s) con valores no positivos, pues requieren logaritmos.` : ''}</p>`;
-    html += table(['h (cm)', '−dh/dt (cm/min)'], R.pairs.map(q => [fmtT(q.h, 4), fmtT(q.y, 4)]), 'Tabla 3. Cálculo de la derivada para h′ = f(h).', 'narrow');
+    const t3 = thin(R.pairs.map(q => [fmtT(q.h, 4), fmtT(q.y, 4)]));
+    html += table(['h (cm)', '−dh/dt (cm/min)'], t3.rows, 'Tabla 3. Cálculo de la derivada para h′ = f(h).' + t3.note, 'narrow');
     html += `<p>Al hacer el ajuste de curva por mínimos cuadrados, aplicando regresión lineal, exponencial y potencial [2] a los datos de la Tabla 3 (las dos últimas mediante linealización logarítmica, ${K('\\ln y = \\ln A + Bh')} y ${K('\\ln y = \\ln A + n\\ln h')}), se obtienen los resultados de las Figuras 3, 4 y 5, que originan las respectivas ecuaciones diferenciales.</p>`;
     html += fig(F.dLin, `Figura 3: Regresión lineal. Análisis de la derivada numérica (R² = ${fmt(ml.fitR2, 4)}).`);
     html += fig(F.dExp, `Figura 4: Regresión exponencial. Análisis de la derivada numérica (R² = ${fmt(me.fitR2, 4)}).`);
@@ -218,7 +235,7 @@
     eqn.r2 = E(); html += eq('R^2 = 1 - \\dfrac{\\sum_i \\left(h_i - \\hat h_i\\right)^2}{\\sum_i \\left(h_i - \\bar h\\right)^2}', eqn.r2);
     const c6h = ['t (min)', 'h (cm) real', 'h aprox. lineal', 'h aprox. exponencial', 'h aprox. potencial'];
     if (fitModel) c6h.push('h Torricelli');
-    const c6 = R.t.map((t, i) => {
+    const c6all = R.t.map((t, i) => {
       const row = [fmtT(R.tRaw[i], 4), fmtT(R.h[i], 4), fmt(ml.pred[i], 5), fmt(me.pred[i], 5), fmt(mp.pred[i], 5)];
       if (fitModel) row.push(fmt(fitModel.hOf(t), 5));
       return row;
@@ -227,8 +244,9 @@
     const r2crow = ['', '<b>r²</b>', ...[ml, me, mp].map(m => fmt(m.r2c, 6))];
     const rmrow = ['', '<b>RMSE (cm)</b>', ...[ml, me, mp].map(m => fmt(m.rmse, 4))];
     if (fitModel) { r2row.push(`<b>${fmt(ctx.fitR2, 6)}</b>`); r2crow.push(fmt(ctx.fitR2c, 6)); rmrow.push(fmt(ctx.fitRmse, 4)); }
+    const c6t = thin(c6all, 40); const c6 = c6t.rows;
     c6.push(r2row, r2crow, rmrow);
-    html += table(c6h, c6, `Cuadro 6. Análisis de resultados. r²: cuadrado del coeficiente de correlación entre datos y modelo.${R.models.some(m => m.nValid < R.n) ? ' “—”: el modelo no tiene valor real (el tanque ya se vació).' : ''}`, 'span-all c6');
+    html += table(c6h, c6, `Cuadro 6. Análisis de resultados. r²: cuadrado del coeficiente de correlación entre datos y modelo.${R.models.some(m => m.nValid < R.n) ? ' “—”: el modelo no tiene valor real (el tanque ya se vació).' : ''}${c6t.note}`, 'span-all c6');
     html += `<p>El mejor modelo lo representa la regresión ${best.nombre.toLowerCase()} de la ecuación diferencial, con ${K(`R^2 = ${tn(best.R2, 6)}`)} y un error cuadrático medio de ${fmt(best.rmse, 3)} cm. En orden, los modelos obtuvieron: ${exps}. Los tiempos de vaciado que predicen (${K('h = 0')}) son ${fmt(ml.tEmpty, 2)} min (lineal), ${fmt(me.tEmpty, 2)} min (exponencial) y ${fmt(mp.tEmpty, 2)} min (potencial).</p>`;
     html += fig(F.compare, 'Figura 6. Comparación de los modelos con los datos reales.', 'span-all-fig');
     html += `<p>Al contrastar con la teoría, el modelo de Torricelli (${eqn.tor}) se ajustó a los datos variando únicamente el coeficiente de descarga, con lo que se obtuvo ${K(`C_d = ${tn(CdFit, 3)}`)} (${K(`R^2 = ${tn(ctx.fitR2, 5)}`)}), ${CdFit > 0.55 && CdFit < 0.7 ? 'valor coherente con el rango típico de 0,6–0,65 para orificios de pared delgada' : CdFit >= 1 ? 'valor mayor que 1, lo que sugiere que las dimensiones del orificio o del tanque declaradas difieren de las reales' : 'valor que difiere del rango típico de 0,6–0,65 para orificios de pared delgada, posiblemente por la geometría real del orificio (boquilla, llave o válvula)'}. Además, el exponente del modelo potencial, ${K(`n = ${tn(mp.coef.n, 4)}`)}, puede compararse con el valor ${K('n = 0{,}5')} que predice Torricelli para tanques de sección constante; para la geometría estudiada el exponente efectivo teórico en el mismo intervalo de alturas es ${K(`n_{\\text{teórico}} \\approx ${tn(nEff, 4)}`)}, ${T.constArea ? '' : 'distinto de 0,5 porque el área de la superficie libre cambia con la altura'}.</p>`;

@@ -149,35 +149,58 @@
   /* ---------- Modelo de Torricelli ---------- */
   /* Crea un modelo teórico para la geometría `key`, parámetros p,
      orificio de diámetro d (cm), coeficiente Cd y nivel inicial h0 (cm). */
-  function torricelli(key, p, d, Cd, h0) {
+  /* z0: elevación de la salida sobre el fondo (cm). La carga hidráulica es h − z0
+     y el tanque deja de vaciarse cuando el nivel llega a z0.
+     t(h) = 2/K ∫_{√(h−z0)}^{√(h0−z0)} A_w(z0 + u²) du   (cambio de variable h = z0 + u²)
+     Con z0 = 0 se usa la primitiva cerrada F; con z0 > 0, Simpson acumulado. */
+  function torricelli(key, p, d, Cd, h0, z0 = 0) {
     const T = TANKS[key];
     const A0 = PI * d * d / 4;
     const K = Cd * A0 * Math.sqrt(2 * G); // cm^2.5/s
-    const Fh0 = T.F(Math.sqrt(h0), p);
-    const tOf = h => (2 / K) * (Fh0 - T.F(Math.sqrt(Math.max(0, Math.min(h, h0))), p)) / 60; // min
-    const tEmpty = tOf(0);
+    z0 = Math.max(0, Math.min(z0, h0));
+    const U0 = Math.sqrt(h0 - z0);
+    let Fu;
+    if (z0 === 0) Fu = u => T.F(u, p);
+    else {
+      const N = 2000, du = U0 / N, cum = new Float64Array(N + 1);
+      const f = u => T.area(z0 + u * u, p);
+      for (let i = 0; i < N; i++) {
+        const a = i * du;
+        cum[i + 1] = cum[i] + du / 6 * (f(a) + 4 * f(a + du / 2) + f(a + du));
+      }
+      Fu = u => {
+        if (du === 0) return 0;
+        const x = Math.min(N, Math.max(0, u / du)), i = Math.min(N - 1, Math.floor(x));
+        return cum[i] + (cum[i + 1] - cum[i]) * (x - i);
+      };
+    }
+    const Fh0 = Fu(U0);
+    const tOf = h => (2 / K) * (Fh0 - Fu(Math.sqrt(Math.max(0, Math.min(h, h0) - z0)))) / 60; // min
+    const tEmpty = tOf(z0);
     const hOf = t => { // inversión por bisección (t(h) es monótona)
       if (t <= 0) return h0;
-      if (t >= tEmpty) return 0;
-      let lo = 0, hi = h0;
+      if (t >= tEmpty) return z0;
+      let lo = z0, hi = h0;
       for (let i = 0; i < 60; i++) {
         const mid = (lo + hi) / 2;
         if (tOf(mid) > t) lo = mid; else hi = mid;
       }
       return (lo + hi) / 2;
     };
-    const dhdt = h => -K * Math.sqrt(Math.max(h, 0)) / T.area(h, p) * 60; // cm/min
+    const head = h => Math.max(h - z0, 0);
+    const dhdt = h => { const A = T.area(h, p); return A > 0 ? -K * Math.sqrt(head(h)) / A * 60 : 0; }; // cm/min
     return {
-      A0, K, tOf, hOf, tEmpty, dhdt,
+      A0, K, Cd, z0, h0, tOf, hOf, tEmpty, dhdt, head,
       area: h => T.area(h, p),
       vol: h => T.vol(h, p),
-      Q: h => Cd * A0 * Math.sqrt(2 * G * Math.max(h, 0)) // cm³/s
+      v: h => Math.sqrt(2 * G * head(h)), // cm/s (velocidad ideal de Torricelli)
+      Q: h => Cd * A0 * Math.sqrt(2 * G * head(h)) // cm³/s
     };
   }
 
   /* Ajuste del Cd efectivo a unos datos (t en min desde la primera lectura). */
-  function fitCd(key, p, d, h0, ts_, hs) {
-    const base = torricelli(key, p, d, 1, h0);
+  function fitCd(key, p, d, h0, ts_, hs, z0 = 0) {
+    const base = torricelli(key, p, d, 1, h0, z0);
     const sse = Cd => {
       let s = 0;
       for (let i = 0; i < ts_.length; i++) { const e = hs[i] - base.hOf(Cd * ts_[i]); s += e * e; }
@@ -313,20 +336,39 @@
     for (const o of opts) if (o >= x) return o;
     return Math.ceil(x / 60) * 60;
   }
-  function simulate(model, { dt, sigma, res, seed }) {
+  /* Muestreo de la solución teórica cada dt minutos (con ruido opcional),
+     usado como "datos" para el método del artículo. */
+  function simulate(model, { dt, sigma = 0, res = 0, seed = 1 }) {
     const rnd = mulberry32(seed | 0);
     const gauss = () => { const u = Math.max(rnd(), 1e-12), v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * PI * v); };
     const tt = [], hh = [];
-    for (let k = 0; k < 400; k++) {
+    const N = Math.min(5000, Math.ceil(model.tEmpty / dt - 1e-9));
+    for (let k = 0; k <= N; k++) {
       const t = k * dt;
       const exact = model.hOf(t);
       let v = k === 0 ? exact : exact + sigma * gauss();
       v = res > 0 ? Math.round(v / res) * res : v;
-      v = Math.max(0, +v.toFixed(6));
-      tt.push(+t.toFixed(6)); hh.push(v);
-      if (exact <= 0 || (k > 2 && v === 0 && exact < 3 * res)) break;
+      v = Math.max(model.z0, +v.toFixed(9));
+      tt.push(+t.toFixed(9)); hh.push(v);
     }
     return { t: tt, h: hh };
+  }
+
+  /* Tabla teórica del laboratorio: filas cada dt minutos hasta el nivel final,
+     más la fila exacta del instante de vaciado si no cae en un múltiplo de dt. */
+  function theoryTable(model, dt, maxRows = 5000) {
+    const rows = [];
+    const N = Math.ceil(model.tEmpty / dt - 1e-9);
+    const n = Math.min(N, maxRows);
+    for (let k = 0; k <= n; k++) {
+      const t = Math.min(k * dt, model.tEmpty);
+      rows.push({ k, t, h: model.hOf(t), final: false });
+      if (k * dt >= model.tEmpty) break;
+    }
+    const last = rows[rows.length - 1];
+    if (n === N && Math.abs(last.t - model.tEmpty) > 1e-12) rows.push({ k: rows.length, t: model.tEmpty, h: model.z0, final: true, extra: true });
+    else if (n === N) last.final = true;
+    return { rows, truncated: n < N, N };
   }
 
   /* ---------- Datos del artículo de referencia (Tablas 1 y 2) ---------- */
@@ -335,5 +377,5 @@
     h: [45.7, 43, 40.4, 37.8, 35.2, 32.8, 30.3, 27.9, 25.6, 23.3, 21.1, 18.9, 16.7, 14.9, 12.8, 11, 9.2, 7.6, 6, 4.6, 3.3, 2, 1, 0]
   };
 
-  global.Num = { G, TANKS, torricelli, fitCd, analyze, simulate, niceStep, linfit, r2det, r2corr, PAPER, fmt, fmtT, tn, ts, setDecimal, getDecimal: () => DEC };
+  global.Num = { G, TANKS, torricelli, fitCd, analyze, simulate, theoryTable, niceStep, linfit, r2det, r2corr, PAPER, fmt, fmtT, tn, ts, setDecimal, getDecimal: () => DEC };
 })(window);
