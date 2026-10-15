@@ -341,7 +341,16 @@
     $('dmm').value = PRESET.dmm; $('cd').value = PRESET.cd; $('h0').value = PRESET.h0;
     setSrc('paper');
   }
+  const framed = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+  function toast(msg) {
+    let t = document.getElementById('toast');
+    if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast no-print'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.hidden = true; }, 7000);
+  }
+  const BLOCKED = 'Esta vista previa bloquea la impresión y las descargas. Abre la web localmente (index.html) o desde GitHub Pages para exportar.';
   function exportPdf() {
+    if (framed) { toast(BLOCKED); return; }
     const ctx = state.last;
     if (!ctx || !ctx.R) return;
     if (!$('paperStage').querySelector('.paper')) renderArticle(ctx);
@@ -352,6 +361,7 @@
     setTimeout(() => { document.title = prev; document.body.classList.remove('printing'); }, 500);
   }
   function downloadCsv() {
+    if (framed) { toast(BLOCKED); return; }
     const ctx = state.last; if (!ctx || !ctx.R) return;
     const R = ctx.R, sep = Num.getDecimal() === ',' ? ';' : ',';
     const f = v => (Number.isFinite(v) ? String(+v.toFixed(6)) : '').replace('.', Num.getDecimal());
