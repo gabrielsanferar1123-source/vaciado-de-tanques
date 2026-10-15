@@ -10,10 +10,6 @@
   }
   global.K = K;
 
-  const EN = {
-    cilindro: 'vertical cylindrical', rectangular: 'rectangular', tronco: 'truncated-cone (bucket-shaped)',
-    cono: 'conical (apex down)', esfera: 'spherical', horizontal: 'horizontal cylindrical'
-  };
   const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   /* ---- Expresiones LaTeX de los modelos (compartidas con la app) ---- */
@@ -165,8 +161,6 @@
     // Resumen
     html += `<p class="abstract"><b><i>Resumen</i>—</b> En este trabajo se presenta la modelación matemática de la relación entre la altura del nivel de líquido en un tanque ${T.articulo} y el tiempo que toma su vaciado a través de un orificio de ${fmtT(d * 10, 2)} mm en el fondo. A partir de ${R.n} lecturas de altura contra tiempo se ajusta primero una regresión lineal directa (R² = ${fmt(R.lin.r2, 4)}); luego, mediante diferenciación numérica con diferencias centradas, se plantean tres ecuaciones diferenciales ordinarias con soporte en mínimos cuadrados (lineal, exponencial y potencial), que se resuelven por separación de variables. El mejor ajuste lo ofrece el modelo ${best.nombre.toLowerCase()}, con un coeficiente de determinación R² = ${fmt(best.R2, 6)} y un tiempo estimado de vaciado de ${fmt(best.tEmpty, 2)} min. Los resultados se contrastan con el modelo teórico de Torricelli, del cual se estima un coeficiente de descarga efectivo C<sub>d</sub> = ${fmt(CdFit, 3)}.</p>`;
     html += `<p class="keywords"><b><i>Palabras clave</i>—</b> Ecuación diferencial, ley de Torricelli, mínimos cuadrados, modelamiento matemático, tanque.</p>`;
-    html += `<p class="abstract"><b><i>Abstract</i>—</b> This work presents the mathematical modeling of the relation between the liquid level in a ${EN[key]} tank and the time it takes to empty through a ${fmtT(d * 10, 2).replace(',', '.')} mm orifice at the bottom. From ${R.n} height–time readings a direct linear regression is fitted first; then, using central-difference numerical differentiation, three ordinary differential equations supported by least squares (linear, exponential and power) are proposed and solved by separation of variables. The best fit is given by the ${({ lineal: 'linear', exponencial: 'exponential', potencial: 'power' })[best.key]} model, with a coefficient of determination R² = ${fmt(best.R2, 6).replace(',', '.')}. Results are compared with Torricelli's theoretical model.</p>`;
-    html += `<p class="keywords"><b><i>Key Words</i>—</b> Differential equation, least squares, mathematical modeling, tank, Torricelli's law.</p>`;
 
     // I. Introducción
     html += `<h2>I. Introducción</h2>`;
