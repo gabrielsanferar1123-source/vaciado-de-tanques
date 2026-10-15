@@ -10,27 +10,23 @@ la extiende a cualquier geometría y genera automáticamente el **artículo cien
 - Tanque **3D interactivo** (Three.js): girar, zoom, desplazar, paredes de vidrio, agua al nivel exacto
   h(t), salida a escala y chorro con la trayectoria parabólica real (v = √(2g(h − z₀))).
 - Geometrías: cilindro vertical, prisma rectangular, tronco de cono (balde), cono, esfera, cilindro horizontal.
-- Unidades mm / cm / m; diámetro de salida en mm, cm, m o pulgadas (1/2", 3/4", 1 1/4"…) con conversión
-  visible y aviso de diámetro nominal vs. interior. Salida elevada z₀ sobre el fondo.
+- Unidades mm / cm / m; diámetro de salida desde una lista de pulgadas fraccionadas (1/8" a 4") o
+  escrito en mm, cm o m, con conversión visible y aviso de diámetro nominal vs. interior. Salida elevada z₀ sobre el fondo.
 - Modelo **Ideal (C_d = 1)** o **con coeficiente de descarga**.
 - **Intervalo de medición** 1, 5, 10, 15, 30, 60 s o personalizado: regenera la tabla sin cambiar la física.
 - **Reproductor** ▶ ⏸ ↺, barra de tiempo y velocidad 0,5×–500×. Todo sincronizado con el mismo t:
   3D, tarjetas (h, V, V evacuado, Q, v, dh/dt), marcador en las gráficas y fila resaltada en la tabla.
 - **4 gráficas** (h, V, Q, v vs. t) con tooltip, zoom por arrastre, series activables y clic para mover t;
-  superposición de los datos experimentales del artículo.
-- **Tabla** (N°, t s/min, h, %, V restante, V evacuado, Q, v, Δh, dh/dt) con CSV, y pestaña aparte
-  con los datos experimentales del artículo.
+  superposición de tus mediciones reales.
+- **Tabla** (N°, t s/min, h, %, V restante, V evacuado, Q, v, Δh, dh/dt) exportable a CSV.
 - **Desarrollo matemático 01–15** en SI: datos → conversión → geometría → volumen → salida → Torricelli →
   caudal → EDO → separación → integración → condición inicial → h(t) → t_v → tabla → derivada numérica.
 - Validaciones físicas (h₀ ≤ H, z₀ < h₀, d < ancho, C_d, Δt > 0…) y selector de 2/3/4/6 decimales.
 
-**Método del artículo (Plaza Gálvez, 2017)** sobre los datos del artículo, la tabla calculada o tus datos:
-regresión lineal, diferenciación numérica (Tablas 2 y 3), EDO lineal/exponencial/potencial resueltas por
-separación de variables (Cuadros 4 y 5), Cuadro 6 y **artículo científico exportable a PDF**.
-
-Con los datos del artículo la aplicación reproduce sus resultados:
-h = −4,0436t + 42,88; −dh/dt = 0,07283h + 2,57805 · 2,63151e^0,01965h · 1,88614h^0,27429;
-h = 81,097e^−0,07283t − 35,397 · −50,89 ln(0,05171t + 0,40738) · (−1,36879t + 16,0184)^1,37796.
+**Análisis numérico** sobre la tabla calculada de tu tanque o sobre tus mediciones reales: regresión
+lineal, diferenciación numérica, EDO lineal/exponencial/potencial resueltas por separación de variables,
+comparación de modelos y **artículo científico exportable a PDF**. La metodología toma como referencia
+a L. F. Plaza Gálvez (2017); la herramienta es autónoma y todo depende del tanque configurado.
 
 ## Uso
 

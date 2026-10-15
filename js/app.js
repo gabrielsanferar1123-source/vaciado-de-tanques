@@ -9,17 +9,27 @@
   const G_SI = 9.81;
 
   const PRESETS = {
-    articulo: { geom: 'tronco', unit: 'cm', params: { d1: 30, d2: 40, H: 55 }, h0: 45.7, d: '8 mm', z0: 0, model: 'cd', cd: 0.61, dt: 30, src: 'paper' },
-    cilindro: { geom: 'cilindro', unit: 'm', params: { D: 0.8, H: 1.2 }, h0: 1, d: '20 mm', z0: 0, model: 'ideal', cd: 1, dt: 30, src: 'table' },
-    rectangular: { geom: 'rectangular', unit: 'm', params: { L: 1, W: 0.6, H: 0.8 }, h0: 0.7, d: '3/4"', z0: 0.05, model: 'cd', cd: 0.61, dt: 15, src: 'table' },
-    cono: { geom: 'cono', unit: 'm', params: { D: 0.8, H: 1 }, h0: 0.9, d: '15 mm', z0: 0, model: 'cd', cd: 0.61, dt: 5, src: 'table' },
-    esfera: { geom: 'esfera', unit: 'm', params: { D: 1.2 }, h0: 1, d: '25 mm', z0: 0, model: 'cd', cd: 0.61, dt: 30, src: 'table' },
-    horizontal: { geom: 'horizontal', unit: 'm', params: { D: 1, L: 2.5 }, h0: 0.9, d: '1"', z0: 0, model: 'cd', cd: 0.61, dt: 60, src: 'table' }
+    balde: { geom: 'tronco', unit: 'cm', params: { d1: 30, d2: 40, H: 55 }, h0: 45.7, d: '5/16"', z0: 0, model: 'cd', cd: 0.61, dt: 30 },
+    cilindro: { geom: 'cilindro', unit: 'm', params: { D: 0.8, H: 1.2 }, h0: 1, d: '3/4"', z0: 0, model: 'ideal', cd: 1, dt: 30 },
+    rectangular: { geom: 'rectangular', unit: 'm', params: { L: 1, W: 0.6, H: 0.8 }, h0: 0.7, d: '3/4"', z0: 0.05, model: 'cd', cd: 0.61, dt: 15 },
+    cono: { geom: 'cono', unit: 'm', params: { D: 0.8, H: 1 }, h0: 0.9, d: '1/2"', z0: 0, model: 'cd', cd: 0.61, dt: 5 },
+    esfera: { geom: 'esfera', unit: 'm', params: { D: 1.2 }, h0: 1, d: '1"', z0: 0, model: 'cd', cd: 0.61, dt: 30 },
+    horizontal: { geom: 'horizontal', unit: 'm', params: { D: 1, L: 2.5 }, h0: 0.9, d: '1"', z0: 0, model: 'cd', cd: 0.61, dt: 60 }
   };
+  /* Diámetros en pulgadas fraccionadas (se muestran con su equivalente en mm) */
+  const INCHES = ['1/8', '3/16', '1/4', '5/16', '3/8', '1/2', '5/8', '3/4', '7/8', '1', '1 1/4', '1 1/2', '2', '2 1/2', '3', '4'];
+  function buildInchSelect() {
+    $('doutSel').innerHTML = INCHES.map(f => `<option value='${f}"'>${f}" (${fmt(Units.parseNumber(f) * 25.4, 2)} mm)</option>`).join('') + '<option value="otro">Otro valor (escribir)…</option>';
+  }
+  function setDiameter(txt) {
+    const opt = [...$('doutSel').options].find(o => o.value === txt);
+    if (opt) { $('doutSel').value = txt; $('doutWrap').hidden = true; }
+    else { $('doutSel').value = 'otro'; $('dout').value = txt; $('doutWrap').hidden = false; }
+  }
 
   const state = {
-    geom: 'tronco', unit: 'cm', params: {}, model: 'cd', dt: 30, digits: 4, src: 'paper',
-    t: 0, playing: false, speed: 1, speedAuto: true, last: null, lab: null, devOpen: true, ttab: 'calc'
+    geom: 'tronco', unit: 'cm', params: {}, model: 'cd', dt: 30, digits: 4, src: 'table',
+    t: 0, playing: false, speed: 1, speedAuto: true, last: null, lab: null, devOpen: true
   };
   Object.keys(TANKS).forEach(k => { state.params[k] = {}; TANKS[k].params.forEach(([pk, , def]) => { state.params[k][pk] = def; }); });
 
@@ -100,14 +110,15 @@
       if (h0 > Ht + 1e-9) { errors.push(`La altura inicial (${fmtLen(h0, 3)}) supera la altura del tanque (${fmtLen(Ht, 3)}).`); $('h0').classList.add('bad'); }
     }
 
-    const dp = Units.parseLength($('dout').value, 'mm');
+    const dSel = $('doutSel').value;
+    const dp = Units.parseLength(dSel === 'otro' ? $('dout').value : dSel, 'mm');
     $('dout').classList.remove('bad');
     let d = NaN, dHint = '';
     if (dp.error) { errors.push('Diámetro de salida: ' + dp.error); $('dout').classList.add('bad'); }
     else {
       d = dp.cm;
       dHint = dp.unit === 'in'
-        ? `${fmtT(dp.value, 4)}" × 25,4 mm/" = <b>${fmt(d * 10, 3)} mm</b> = ${sci(d / 100, 5)} m. <span class="warn-t">Ojo: si es una medida nominal de tubería, el diámetro interior real es distinto; usa el interior para un cálculo preciso.</span>`
+        ? `${/\//.test(dp.text) ? dp.text.replace(/["”]\s*$/, '') + '" = ' : ''}${fmtT(dp.value, 4)}" × 25,4 mm/" = <b>${fmt(d * 10, 3)} mm</b> = ${sci(d / 100, 5)} m.<br><span class="warn-t">Si es la medida nominal de una tubería, usa su diámetro interior real (elige “Otro valor”).</span>`
         : `d = <b>${fmt(d * 10, 3)} mm</b> = ${sci(d / 100, 5)} m (diámetro interior).`;
     }
     $('doutHint').innerHTML = dHint;
@@ -226,8 +237,8 @@
     const H = ts_.map(t => m.hOf(t / 60));
     const hSeries = [{ name: 'Modelo teórico h(t)', pts: ts_.map((t, i) => [t, toU(H[i])]), color: C.h, main: true }];
     hSeries.push({ name: `Mediciones cada ${fmtT(lab.cfg.dt, 3)} s`, kind: 'points', pts: lab.rows.length <= 400 ? lab.rows.map(r => [r.ts, toU(r.h)]) : [], color: '#93c5fd' });
-    if ($('overlay').checked && R && state.src !== 'table') {
-      hSeries.push({ name: state.src === 'paper' ? 'DATOS EXPERIMENTALES (artículo)' : 'DATOS EXPERIMENTALES (propios)', kind: 'points', pts: R.tRaw.map((t, i) => [(t - R.t0) * 60, toU(R.h[i])]), color: C.exp });
+    if ($('overlay').checked && R && state.src === 'own') {
+      hSeries.push({ name: 'Mis mediciones (experimentales)', kind: 'points', pts: R.tRaw.map((t, i) => [(t - R.t0) * 60, toU(R.h[i])]), color: C.exp });
     }
     charts[0].setData(hSeries);
     charts[1].setData([{ name: 'V(t)', pts: ts_.map((t, i) => [t, m.vol(H[i]) / 1000]), color: C.V, main: true }]);
@@ -249,9 +260,6 @@
     $('tblCalc').innerHTML = `<table class="dt"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`;
     rowEls = [...$('tblCalc').querySelectorAll('tbody tr')];
     lastRow = -1;
-    // datos del artículo
-    const P = Num.PAPER;
-    $('tblPaper').innerHTML = `<p class="note">Datos <b>experimentales</b> de Plaza Gálvez (2017), Tabla 1 (t ≤ 10,5 min) y Tabla 2 (11 y 11,5 min). Se muestran aparte y nunca se mezclan con la tabla calculada.</p><div class="tblwrap scroll"><table class="dt"><thead><tr><th>N°</th><th>t (min)</th><th>t (s)</th><th>h (cm)</th><th>Fuente</th></tr></thead><tbody>${P.t.map((t, i) => `<tr><td>${i}</td><td>${fmtT(t, 2)}</td><td>${fmtT(t * 60, 1)}</td><td>${fmtT(P.h[i], 2)}</td><td>${t <= 10.5 ? 'Tabla 1' : 'Tabla 2'}</td></tr>`).join('')}</tbody></table></div>`;
   }
   let lastRow = -1;
   function highlightRow(lab, t) {
@@ -265,7 +273,7 @@
     if (!r) return;
     r.classList.add('cur');
     const box = $('tblCalc');
-    if (state.ttab === 'calc' && box.offsetParent) {
+    if (box.offsetParent) {
       const top = r.offsetTop - box.clientHeight / 2;
       box.scrollTop = Math.max(0, top);
     }
@@ -406,15 +414,13 @@
   function computeAnalysis(lab) {
     const cfg = lab.cfg, key = cfg.key, p = cfg.p;
     let data = null, src = { mode: state.src };
-    if (state.src === 'paper') data = { t: Num.PAPER.t.slice(), h: Num.PAPER.h.slice() };
-    else if (state.src === 'own') {
+    if (state.src === 'own') {
       data = parseOwn($('ownData').value);
       $('ownErr').textContent = data.t.length < 5 ? `Se necesitan al menos 5 lecturas válidas (hay ${data.t.length}).` : '';
       if (data.t.length < 5) data = null;
     } else {
-      const sigma = Math.max(0, Units.parseNumber($('sigma').value) || 0), res = Math.max(0, Units.parseNumber($('res').value) || 0);
-      src = { mode: 'table', dt: cfg.dt / 60, dtSec: cfg.dt, sigma, res };
-      data = Num.simulate(lab.model, { dt: cfg.dt / 60, sigma, res, seed: +$('seed').value || 7 });
+      src = { mode: 'table', dt: cfg.dt / 60, dtSec: cfg.dt, sigma: 0, res: 0 };
+      data = Num.simulate(lab.model, { dt: cfg.dt / 60 });
       if (data.t.length < 5) { $('banner').hidden = false; $('banner').innerHTML = '<p>⚠ Con este Δt la tabla tiene menos de 5 mediciones; reduce el intervalo para aplicar el método.</p>'; return null; }
     }
     if (!data) return null;
@@ -430,7 +436,6 @@
     const fpred = R.t.map(fitModel.hOf);
     const hs = R.posPairs.map(q => q.h).filter(h => h > z0);
     const nEff = hs.length > 2 ? Num.linfit(hs.map(Math.log), hs.map(h => Math.log(-theory.dhdt(h)))).a : NaN;
-    if (state.src === 'paper' && key !== 'tronco') warnings.push('Estás analizando los datos reales del artículo (tanque tipo balde). La geometría configurada solo cambia el modelo teórico de comparación; para analizar tu tanque elige “Tabla calculada”.');
     return {
       key, T: cfg.T, p, d: cfg.d, Cd: cfg.Cd, z0, theory, warnings, R, src, CdFit, fitModel, nEff,
       fitR2: Num.r2det(R.h, fpred), fitR2c: Num.r2corr(R.h, fpred),
@@ -445,7 +450,7 @@
 
   function renderData(ctx) {
     const R = ctx.R;
-    const srcName = { paper: 'Datos experimentales del artículo de Plaza Gálvez (2017)', table: `Tabla calculada con el modelo teórico (Δt = ${fmtT(ctx.src.dtSec || 0, 4)} s${ctx.src.sigma ? `, ruido σ = ${fmtT(ctx.src.sigma, 3)} cm` : ''})`, own: 'Datos propios ingresados' }[state.src];
+    const srcName = { table: `Mediciones de la tabla calculada de tu tanque (una cada Δt = ${fmtT(ctx.src.dtSec || 0, 4)} s)`, own: 'Mis mediciones reales' }[state.src];
     let html = `<p class="lead">${srcName}. <b>${R.n}</b> lecturas, ${R.uniform ? `paso constante Δt = <b>${fmtT(R.steps[0], 4)} min</b>` : 'paso de tiempo variable'}, desde h = ${fmtT(R.h[0], 3)} cm hasta h = ${fmtT(R.h[R.n - 1], 3)} cm.</p>`;
     html += `<div class="two"><div>${tableH(['i', 't (min)', 'h (cm)'], R.tRaw.map((t, i) => [i, fmtT(t, 4), fmtT(R.h[i], 4)]), 'scroll')}<p class="cap">Tabla 1. Toma de datos h = f(t).</p></div>`;
     html += `<div class="chart-card">${Charts.chart({ width: 620, height: 380, xLabel: 'Tiempo, t (min)', yLabel: 'Altura, h (cm)', legend: 'tr', series: [
@@ -514,7 +519,7 @@
     html += tableH(['Regresión', 'Ecuación diferencial', 'R² del ajuste'], R.models.map(m => [m.nombre, K(TeX.ode(m)), fmt(m.fitR2, 5)]));
     html += `<h3 class="sub">Cuadro 5 · Modelos h = f(t)</h3>`;
     html += tableH(['Regresión', 'Expresión matemática h = f(t)', 'R² (1 − SSE/SST)', 'r² (correlación)'], R.models.map(m => ({ cls: m === R.best ? 'best' : '', cells: [m.nombre, K(TeX.sol(m)), fmt(m.R2, 6), fmt(m.r2c, 6)] })));
-    html += `<p class="note">El artículo reporta en su Cuadro 5 el <b>r²</b> (cuadrado de la correlación entre datos y modelo): con sus datos se obtiene 0,999461 · 0,998897 · 0,999965, igual que en el artículo. La columna R² = 1 − SSE/SST es más exigente porque también penaliza el sesgo.</p>`;
+    html += `<p class="note"><b>R²</b> = 1 − SSE/SST mide qué tanto del cambio de h explica el modelo, penalizando también el sesgo. <b>r²</b> es el cuadrado de la correlación entre mediciones y modelo; siempre es igual o mayor.</p>`;
     $('modelSec').innerHTML = html;
   }
 
@@ -638,11 +643,9 @@
     Object.entries(P.params).forEach(([k, v]) => { state.params[P.geom][k] = Units.toCm(v, P.unit); });
     $('geom').value = P.geom; segOn('unitSeg', 'unit', P.unit);
     buildGeomParams();
-    $('h0').value = fmtT(P.h0, 6); $('dout').value = P.d; $('z0').value = fmtT(P.z0, 6);
+    $('h0').value = fmtT(P.h0, 6); setDiameter(P.d); $('z0').value = fmtT(P.z0, 6);
     state.model = P.model; segOn('modelSeg', 'model', P.model); $('cd').value = fmtT(P.cd, 4); updateCdUi();
     state.dt = P.dt; segOn('dtChips', 'dt', P.dt); $('dtCustomWrap').hidden = true;
-    setSrc(P.src, false);
-    $('overlay').checked = P.src === 'paper';
     state.t = 0; state.speedAuto = true;
     if (tank3d) tank3d.sig = null;
     render();
@@ -656,7 +659,7 @@
     segOn('srcSeg', 'src', src);
     document.querySelectorAll('.srcbox').forEach(b => { b.hidden = b.dataset.for !== src; });
     if (src === 'own' && !$('ownData').value.trim() && state.last && state.last.R) copyData();
-    if (src === 'paper') $('overlay').checked = true;
+    $('overlayWrap').hidden = src !== 'own';
     if (rerender) render();
   }
   function copyData() {
@@ -720,7 +723,12 @@
       state.unit = nu; segOn('unitSeg', 'unit', nu);
       buildGeomParams(); if (tank3d) tank3d.sig = null; render();
     }));
-    ['h0', 'dout', 'z0', 'cd', 'dtCustom', 'sigma', 'res', 'seed', 'ownData'].forEach(id => $(id).addEventListener('input', schedule));
+    ['h0', 'dout', 'z0', 'cd', 'dtCustom', 'ownData'].forEach(id => $(id).addEventListener('input', schedule));
+    $('doutSel').addEventListener('change', e => {
+      $('doutWrap').hidden = e.target.value !== 'otro';
+      if (e.target.value === 'otro') $('dout').focus();
+      render();
+    });
     document.querySelectorAll('#modelSeg button').forEach(b => b.addEventListener('click', () => { state.model = b.dataset.model; segOn('modelSeg', 'model', state.model); updateCdUi(); render(); }));
     document.querySelectorAll('#dtChips button').forEach(b => b.addEventListener('click', () => {
       state.dt = b.dataset.dt === 'custom' ? 'custom' : +b.dataset.dt;
@@ -757,12 +765,6 @@
         document.querySelectorAll('#modelSec .tab').forEach(t => t.classList.toggle('on', t === tab));
         document.querySelectorAll('.tabpane').forEach(p => { p.hidden = +p.dataset.pane !== state.modelTab; });
       }
-      const tt = e.target.closest('[data-ttab]');
-      if (tt) {
-        state.ttab = tt.dataset.ttab;
-        document.querySelectorAll('[data-ttab]').forEach(t => t.classList.toggle('on', t === tt));
-        $('tblCalc').hidden = state.ttab !== 'calc'; $('tblPaper').hidden = state.ttab !== 'paper';
-      }
     });
     document.addEventListener('keydown', e => {
       if (e.code === 'Space' && !/INPUT|TEXTAREA|SELECT|BUTTON/.test(document.activeElement.tagName) && !document.activeElement.isContentEditable) { e.preventDefault(); state.playing ? pause() : play(); }
@@ -776,9 +778,10 @@
   }
 
   buildGeomSelect();
+  buildInchSelect();
   initMeta();
   initCharts();
   try { tank3d = new Tank3D($('viewer')); if (!tank3d.ok) tank3d = null; } catch (e) { tank3d = null; $('viewer').innerHTML = '<p class="nogl">No se pudo iniciar la vista 3D en este navegador.</p>'; }
   bind();
-  applyPreset('articulo');
+  applyPreset('balde');
 })();

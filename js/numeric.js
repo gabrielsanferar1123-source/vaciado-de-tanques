@@ -371,11 +371,5 @@
     return { rows, truncated: n < N, N };
   }
 
-  /* ---------- Datos del artículo de referencia (Tablas 1 y 2) ---------- */
-  const PAPER = {
-    t: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5],
-    h: [45.7, 43, 40.4, 37.8, 35.2, 32.8, 30.3, 27.9, 25.6, 23.3, 21.1, 18.9, 16.7, 14.9, 12.8, 11, 9.2, 7.6, 6, 4.6, 3.3, 2, 1, 0]
-  };
-
-  global.Num = { G, TANKS, torricelli, fitCd, analyze, simulate, theoryTable, niceStep, linfit, r2det, r2corr, PAPER, fmt, fmtT, tn, ts, setDecimal, getDecimal: () => DEC };
+  global.Num = { G, TANKS, torricelli, fitCd, analyze, simulate, theoryTable, niceStep, linfit, r2det, r2corr, fmt, fmtT, tn, ts, setDecimal, getDecimal: () => DEC };
 })(window);

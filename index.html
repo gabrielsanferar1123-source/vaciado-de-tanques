@@ -22,7 +22,7 @@
       <a href="#graficas">Gráficas</a>
       <a href="#tabla">Tabla</a>
       <a href="#desarrollo">Desarrollo</a>
-      <a href="#metodo">Método del artículo</a>
+      <a href="#metodo">Análisis numérico</a>
       <a href="#articulo">Artículo</a>
     </nav>
     <button class="btn primary" data-action="pdf">Exportar PDF</button>
@@ -34,8 +34,8 @@
         <h3>Ejemplos</h3>
         <select id="preset" aria-label="Cargar ejemplo">
           <option value="">Cargar un ejemplo…</option>
-          <option value="articulo">Experimento del artículo (balde)</option>
-          <option value="cilindro">Cilindro 0,80 × 1,20 m · salida 20 mm</option>
+          <option value="balde">Balde 30/40 cm · salida 5/16"</option>
+          <option value="cilindro">Cilindro 0,80 × 1,20 m · salida 3/4"</option>
           <option value="rectangular">Tanque rectangular 1,0 × 0,6 m · 3/4"</option>
           <option value="cono">Tolva cónica 0,8 m · salida 15 mm</option>
           <option value="esfera">Esfera 1,2 m · salida 25 mm</option>
@@ -56,7 +56,10 @@
       <section class="panel">
         <h3>Sistema de vaciado</h3>
         <label>Diámetro interior de la salida
-          <input type="text" id="dout" value="8 mm" placeholder="20 mm · 3/4&quot; · 1&quot;">
+          <select id="doutSel"></select>
+        </label>
+        <label id="doutWrap" hidden>Escribe el diámetro (mm, cm, m o pulgadas)
+          <input type="text" id="dout" value="8 mm" placeholder="20 mm · 0,02 m · 7/8&quot;">
         </label>
         <p class="hint" id="doutHint"></p>
         <label>Elevación de la salida sobre el fondo z₀ <span class="u" data-u></span>
@@ -125,7 +128,7 @@
       <!-- Gráficas -->
       <section class="card" id="graficas">
         <div class="card-head"><div><h2>Gráficas</h2><p>Pasa el mouse para ver valores · arrastra para hacer zoom (doble clic restablece) · clic para mover el tiempo · la leyenda activa/desactiva series.</p></div>
-          <label class="check"><input type="checkbox" id="overlay"> Superponer datos experimentales</label></div>
+          <label class="check" id="overlayWrap" hidden><input type="checkbox" id="overlay" checked> Superponer mis mediciones</label></div>
         <div class="chart-grid">
           <div id="chH"></div><div id="chV"></div><div id="chQ"></div><div id="chv"></div>
         </div>
@@ -135,12 +138,7 @@
       <section class="card" id="tabla">
         <div class="card-head"><div><h2>Tabla de mediciones</h2><p id="tableSub"></p></div>
           <div class="head-actions"><button class="btn small" data-action="csvTable">Descargar CSV</button></div></div>
-        <div class="tabs" role="tablist">
-          <button class="tab on" data-ttab="calc">Tabla calculada (modelo teórico)</button>
-          <button class="tab" data-ttab="paper">Datos del artículo (experimentales)</button>
-        </div>
         <div id="tblCalc" class="tblwrap scroll tall"></div>
-        <div id="tblPaper" hidden></div>
       </section>
 
       <!-- Desarrollo matemático -->
@@ -152,30 +150,22 @@
 
       <!-- Método del artículo -->
       <div class="part-title" id="metodo">
-        <h2>Método del artículo de Plaza Gálvez (2017)</h2>
-        <p>Regresión, diferenciación numérica y ecuaciones diferenciales a partir de mediciones h(t). Unidades del artículo: cm y min.</p>
+        <h2>Análisis numérico de las mediciones</h2>
+        <p>Regresión por mínimos cuadrados, diferenciación numérica y ecuaciones diferenciales a partir de las mediciones h(t) de tu tanque. En esta parte las alturas van en cm y el tiempo en min.</p>
       </div>
       <section class="card" id="datos">
         <div class="card-head"><span class="num">A</span><div><h2>Datos para el análisis</h2><p>Elige qué mediciones se analizan.</p></div></div>
         <div class="seg wide" id="srcSeg" role="radiogroup">
-          <button data-src="paper" class="on">Datos del artículo</button>
-          <button data-src="table">Tabla calculada</button>
-          <button data-src="own">Mis datos</button>
+          <button data-src="table" class="on">Tabla calculada de mi tanque</button>
+          <button data-src="own">Mis mediciones reales</button>
         </div>
-        <div data-for="table" class="srcbox" hidden>
-          <div class="grid3">
-            <label>Ruido de medición σ (cm)<input type="text" inputmode="decimal" id="sigma" value="0"></label>
-            <label>Resolución de lectura (cm)<input type="text" inputmode="decimal" id="res" value="0"></label>
-            <label>Semilla<input type="number" id="seed" step="1" value="7"></label>
-          </div>
-          <p class="hint">Con σ = 0 se analiza la solución teórica exacta muestreada cada Δt. Un σ &gt; 0 imita errores de lectura con regla y cronómetro.</p>
-        </div>
+        <p class="hint srcbox" data-for="table">Se analizan las mediciones de la tabla calculada (una cada Δt). Si hiciste el ensayo en el laboratorio, elige “Mis mediciones reales” y pega tus datos.</p>
         <div data-for="own" class="srcbox" hidden>
           <label>Pega dos columnas: t (min) y h (cm)
             <textarea id="ownData" rows="8" spellcheck="false" placeholder="0	45,7&#10;0,5	43&#10;1	40,4"></textarea>
           </label>
           <p class="hint">Acepta tabulador, espacio o punto y coma, y coma o punto decimal (se puede pegar desde Excel).</p>
-          <button class="btn small" data-action="copyData">Copiar los datos actuales aquí</button>
+          <button class="btn small" data-action="copyData">Copiar aquí la tabla calculada</button>
           <p class="err" id="ownErr"></p>
         </div>
         <div class="banner" id="banner" hidden></div>
@@ -208,7 +198,7 @@
           <label class="full">Institución<input id="mAffil" type="text"></label>
           <label>Encabezado (revista / curso)<input id="mJournal" type="text"></label>
           <label>Fecha<input id="mDate" type="text"></label>
-          <label class="full" id="procWrap">Procedimiento experimental (se usa con “Mis datos”)<textarea id="mProc" rows="3"></textarea></label>
+          <label class="full" id="procWrap">Procedimiento experimental (se usa con “Mis mediciones reales”)<textarea id="mProc" rows="3"></textarea></label>
           <div class="full row">
             <label class="check"><input type="checkbox" id="mTwoCol" checked> Formato revista (dos columnas)</label>
             <label class="check"><input type="checkbox" id="mEdit"> Permitir editar el texto en la vista previa</label>
@@ -221,7 +211,7 @@
         <div class="paper-stage" id="paperStage"></div>
       </section>
 
-      <footer class="foot no-print">Metodología basada en L. F. Plaza Gálvez, “Modelo matemático para vaciado de tanques”, <i>Scientia et Technica</i> 22(1), 2017.</footer>
+      <footer class="foot no-print">Herramienta construida tomando como referencia metodológica a L. F. Plaza Gálvez, “Modelo matemático para vaciado de tanques”, <i>Scientia et Technica</i> 22(1), 2017.</footer>
     </main>
   </div>
 
